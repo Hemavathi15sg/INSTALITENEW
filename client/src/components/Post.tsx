@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import { Heart, MessageCircle, Trash2, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
