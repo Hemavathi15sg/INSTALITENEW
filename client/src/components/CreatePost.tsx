@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
-import { X } from 'lucide-react';
+import { X, Sparkles } from 'lucide-react';
 
 interface CreatePostProps {
   onClose: () => void;
@@ -11,12 +11,46 @@ const CreatePost: React.FC<CreatePostProps> = ({ onClose, onPostCreated }) => {
   const [caption, setCaption] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>('');
+  const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
+  const [captionError, setCaptionError] = useState<string>('');
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setImage(file);
       setPreview(URL.createObjectURL(file));
+      setCaptionError(''); // Clear any previous errors
+    }
+  };
+
+  const handleGenerateCaption = async () => {
+    if (!image) {
+      setCaptionError('Please select an image first');
+      return;
+    }
+
+    setIsGeneratingCaption(true);
+    setCaptionError('');
+
+    const formData = new FormData();
+    formData.append('image', image);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/posts/generate-caption', formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      setCaption(response.data.caption);
+    } catch (err: any) {
+      console.error('Failed to generate caption', err);
+      const errorMsg = err.response?.data?.error || 'Failed to generate caption. Please try again.';
+      setCaptionError(errorMsg);
+    } finally {
+      setIsGeneratingCaption(false);
     }
   };
 
@@ -67,13 +101,31 @@ const CreatePost: React.FC<CreatePostProps> = ({ onClose, onPostCreated }) => {
             )}
           </div>
 
-          <textarea
-            placeholder="Write a caption..."
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded mb-4 resize-none"
-            rows={3}
-          />
+          <div className="mb-4">
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={handleGenerateCaption}
+                disabled={!image || isGeneratingCaption}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded font-semibold hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                <Sparkles size={18} />
+                {isGeneratingCaption ? 'Generating...' : 'AI Generate Caption'}
+              </button>
+            </div>
+            
+            {captionError && (
+              <div className="text-red-500 text-sm mb-2">{captionError}</div>
+            )}
+
+            <textarea
+              placeholder="Write a caption..."
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded resize-none"
+              rows={3}
+            />
+          </div>
 
           <button 
             type="submit"

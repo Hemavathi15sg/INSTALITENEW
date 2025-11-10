@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { Database } from '../database';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import captionService from '../services/captionService';
 
 const router = express.Router();
 const db = Database.getInstance().getDb();
@@ -49,6 +50,30 @@ router.post('/', authenticate, upload.single('image'), (req: AuthRequest, res) =
       res.status(201).json({ id: this.lastID, imageUrl, caption });
     }
   );
+});
+
+// Generate AI caption for an image
+router.post('/generate-caption', authenticate, upload.single('image'), async (req: AuthRequest, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    // Check if service is configured
+    if (!captionService.isConfigured()) {
+      return res.status(503).json({ 
+        error: 'Caption generation service not configured. Please set HUGGINGFACE_API_KEY environment variable.' 
+      });
+    }
+
+    // Generate caption
+    const caption = await captionService.generateCaption(req.file.path);
+    
+    res.json({ caption });
+  } catch (error) {
+    console.error('Caption generation error:', error);
+    res.status(500).json({ error: 'Failed to generate caption' });
+  }
 });
 
 // Delete post - MUST come BEFORE /:id/like and /:id/comments routes
