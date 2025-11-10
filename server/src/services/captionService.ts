@@ -1,5 +1,6 @@
 import { HfInference } from '@huggingface/inference';
 import * as fs from 'fs';
+import * as path from 'path';
 
 const HF_TOKEN = process.env.HUGGINGFACE_API_KEY || '';
 
@@ -8,9 +9,20 @@ const HF_TOKEN = process.env.HUGGINGFACE_API_KEY || '';
  */
 export class CaptionService {
   private hf: HfInference;
+  private readonly UPLOAD_DIR = path.resolve('uploads');
 
   constructor() {
     this.hf = new HfInference(HF_TOKEN);
+  }
+
+  /**
+   * Validate that the file path is within the uploads directory
+   * @param filePath - Path to validate
+   * @returns true if path is safe, false otherwise
+   */
+  private isValidPath(filePath: string): boolean {
+    const resolvedPath = path.resolve(filePath);
+    return resolvedPath.startsWith(this.UPLOAD_DIR);
   }
 
   /**
@@ -20,6 +32,16 @@ export class CaptionService {
    */
   async generateCaption(imagePath: string): Promise<string> {
     try {
+      // Validate the file path to prevent path traversal attacks
+      if (!this.isValidPath(imagePath)) {
+        throw new Error('Invalid file path');
+      }
+
+      // Verify file exists and is readable
+      if (!fs.existsSync(imagePath)) {
+        throw new Error('File not found');
+      }
+
       // Read the image file as a Blob
       const imageBuffer = fs.readFileSync(imagePath);
       const blob = new Blob([imageBuffer]);

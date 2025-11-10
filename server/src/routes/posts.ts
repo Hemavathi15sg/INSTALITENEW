@@ -1,12 +1,22 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
+import rateLimit from 'express-rate-limit';
 import { Database } from '../database';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import captionService from '../services/captionService';
 
 const router = express.Router();
 const db = Database.getInstance().getDb();
+
+// Rate limiter for AI caption generation (5 requests per minute per user)
+const captionRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // 5 requests per minute
+  message: 'Too many caption generation requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Multer configuration for image uploads
 const storage = multer.diskStorage({
@@ -53,7 +63,7 @@ router.post('/', authenticate, upload.single('image'), (req: AuthRequest, res) =
 });
 
 // Generate AI caption for an image
-router.post('/generate-caption', authenticate, upload.single('image'), async (req: AuthRequest, res) => {
+router.post('/generate-caption', captionRateLimiter, authenticate, upload.single('image'), async (req: AuthRequest, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
