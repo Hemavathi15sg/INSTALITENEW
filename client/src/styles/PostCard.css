@@ -1,0 +1,83 @@
+/* ...existing code... */
+
+.post-card {
+  background: white;
+  border: 1px solid #dbdbdb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.post-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+}
+
+.post-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.delete-btn {
+  background: transparent;
+  border: none;
+  color: #8e8e8e;
+  font-size: 32px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 8px;
+  transition: color 0.2s;
+  line-height: 1;
+  height: 32px;
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-btn:hover {
+  color: #ed4956;
+}
+
+.post-image {
+  width: 100%;
+  display: block;
+}
+
+.post-content {
+  padding: 12px;
+}
+
+.caption {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+}
+
+.post-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  color: #666;
+}
+
+.action-icons {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.delete-action-btn {
+  margin-left: auto;
+}
+
+.delete-action-btn:hover {
+  color: #ed4956;
+}
+
+.delete-action-btn svg {
+  stroke: currentColor;
+}
+
+/* ...existing code... */
