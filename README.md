@@ -8,7 +8,6 @@ A simple Instagram clone built to demonstrate GitHub Copilot's capabilities acro
 - ✅ Post creation with image upload
 - ✅ User profiles
 - ✅ Comments on posts
-- 🎯 **READY TO ADD**: AI-Powered Image Captions (Copilot Demo Feature)
 
 ## Tech Stack
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS
