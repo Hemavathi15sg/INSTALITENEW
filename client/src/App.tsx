@@ -16,7 +16,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen">
         {isAuthenticated && <Navbar setIsAuthenticated={setIsAuthenticated} />}
         <Routes>
           <Route 
