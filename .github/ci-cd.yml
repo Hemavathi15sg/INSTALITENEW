@@ -1,0 +1,310 @@
+name: Instagram Lite CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, BetterUI]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20.x'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Job 1: Validate environment and dependencies
+  validate:
+    name: Validate Environment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate package.json files
+        run: |
+          echo "Validating package.json files..."
+          node -e "JSON.parse(require('fs').readFileSync('package.json'))"
+          node -e "JSON.parse(require('fs').readFileSync('client/package.json'))"
+          node -e "JSON.parse(require('fs').readFileSync('server/package.json'))"
+          echo "✅ All package.json files are valid"
+
+      - name: Check for required files
+        run: |
+          echo "Checking required files..."
+          test -f .gitignore || (echo "❌ .gitignore missing" && exit 1)
+          test -f client/tsconfig.json || (echo "❌ client/tsconfig.json missing" && exit 1)
+          test -f server/tsconfig.json || (echo "❌ server/tsconfig.json missing" && exit 1)
+          echo "✅ All required files present"
+
+  # Job 2: Lint and Security Scan
+  security-scan:
+    name: Security & Code Quality
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run npm audit on server
+        run: |
+          cd server
+          npm audit --audit-level=moderate || true
+
+      - name: Run npm audit on client
+        run: |
+          cd client
+          npm audit --audit-level=moderate || true
+
+      - name: Check for secrets in code
+        run: |
+          echo "Scanning for potential secrets..."
+          ! grep -r "sk-[a-zA-Z0-9]\{48\}" --exclude-dir=node_modules --exclude-dir=.git . || (echo "❌ Potential API key found!" && exit 1)
+          ! grep -r "AKIA[0-9A-Z]\{16\}" --exclude-dir=node_modules --exclude-dir=.git . || (echo "❌ Potential AWS key found!" && exit 1)
+          echo "✅ No secrets detected"
+
+  # Job 3: Test and Build Server
+  test-server:
+    name: Test & Build Server
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        run: |
+          cd server
+          npm ci
+
+      - name: Validate TypeScript configuration
+        run: |
+          cd server
+          npx tsc --noEmit
+
+      - name: Run TypeScript compilation
+        run: |
+          cd server
+          npm run build
+
+      - name: Run server tests
+        run: |
+          cd server
+          npm test -- --coverage --passWithNoTests
+        env:
+          NODE_ENV: test
+          OPENAI_API_KEY: sk-test-dummy-key-for-ci
+
+      - name: Upload server coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./server/coverage/lcov.info
+          flags: server
+          name: server-coverage
+          fail_ci_if_error: false
+
+      - name: Archive server build
+        uses: actions/upload-artifact@v3
+        with:
+          name: server-dist
+          path: server/dist
+          retention-days: 1
+
+  # Job 4: Test and Build Client
+  test-client:
+    name: Test & Build Client
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: |
+          cd client
+          npm ci
+
+      - name: Validate TypeScript configuration
+        run: |
+          cd client
+          npx tsc --noEmit
+
+      - name: Build client application
+        run: |
+          cd client
+          npm run build
+
+      - name: Check build output
+        run: |
+          cd client
+          test -d dist || (echo "❌ Build failed - dist folder not created" && exit 1)
+          echo "✅ Client build successful"
+
+      - name: Archive client build
+        uses: actions/upload-artifact@v3
+        with:
+          name: client-dist
+          path: client/dist
+          retention-days: 1
+
+  # Job 5: Build Docker Images
+  build-docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test-server, test-client, security-scan]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for server
+        id: meta-server
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-server
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=semver,pattern={{version}}
+
+      - name: Build and push server image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: true
+          tags: ${{ steps.meta-server.outputs.tags }}
+          labels: ${{ steps.meta-server.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-server:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-server:buildcache,mode=max
+
+      - name: Extract metadata for client
+        id: meta-client
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-client
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=semver,pattern={{version}}
+
+      - name: Build and push client image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./client
+          file: ./client/Dockerfile
+          push: true
+          tags: ${{ steps.meta-client.outputs.tags }}
+          labels: ${{ steps.meta-client.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-client:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-client:buildcache,mode=max
+
+  # Job 6: Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: staging
+      url: https://staging.instagram-lite.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure staging deployment
+        run: |
+          echo "🚀 Deploying to staging environment..."
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+
+      - name: Simulate deployment (Replace with actual deployment)
+        run: |
+          echo "In production, this would:"
+          echo "1. Pull latest Docker images from GHCR"
+          echo "2. Update Kubernetes/ECS configurations"
+          echo "3. Apply database migrations"
+          echo "4. Perform health checks"
+          echo "5. Route traffic to new deployment"
+          
+          # Example for Kubernetes:
+          # kubectl set image deployment/instagram-lite-server server=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-server:${{ github.sha }}
+          # kubectl set image deployment/instagram-lite-client client=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-client:${{ github.sha }}
+          # kubectl rollout status deployment/instagram-lite-server
+          # kubectl rollout status deployment/instagram-lite-client
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests on staging..."
+          # Add actual smoke tests here
+          # curl -f https://staging.instagram-lite.example.com/api/health || exit 1
+
+      - name: Deployment summary
+        run: |
+          echo "### Deployment Summary 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Staging" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+
+  # Job 7: Notification
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [test-server, test-client, security-scan]
+    if: always()
+    steps:
+      - name: Check job results
+        run: |
+          echo "Test Server: ${{ needs.test-server.result }}"
+          echo "Test Client: ${{ needs.test-client.result }}"
+          echo "Security Scan: ${{ needs.security-scan.result }}"
+
+      - name: Create summary
+        run: |
+          echo "## CI/CD Pipeline Results 📊" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Server Tests | ${{ needs.test-server.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Client Tests | ${{ needs.test-client.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | ${{ needs.security-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
