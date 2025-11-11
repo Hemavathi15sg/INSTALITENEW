@@ -12,25 +12,42 @@ const Navbar: React.FC<NavbarProps> = ({ setIsAuthenticated }) => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('userId');
     setIsAuthenticated(false);
   };
 
   return (
-    <nav className="bg-white border-b border-gray-300 fixed top-0 w-full z-50">
+    <nav className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 border-b border-white/20 fixed top-0 w-full z-50 shadow-lg backdrop-blur-sm">
       <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-        <Link to="/" className="flex items-center gap-2">
-          <Camera size={28} className="text-pink-600" />
-          <span className="text-2xl font-bold font-serif">Instagram Lite</span>
+        <Link to="/" className="flex items-center gap-2 group">
+          <div className="bg-white/20 backdrop-blur-md p-2 rounded-full group-hover:bg-white/30 transition">
+            <Camera size={28} className="text-white" />
+          </div>
+          <span className="text-2xl font-bold font-serif text-white drop-shadow-lg">
+            Insta Lite
+          </span>
         </Link>
         
         <div className="flex items-center gap-6">
-          <Link to="/" className="hover:text-gray-600">
+          <Link 
+            to="/" 
+            className="text-white hover:bg-white/20 p-2 rounded-full transition backdrop-blur-sm"
+            title="Home"
+          >
             <Home size={24} />
           </Link>
-          <Link to={`/profile/${user.id}`} className="hover:text-gray-600">
+          <Link 
+            to={`/profile/${user.id}`} 
+            className="text-white hover:bg-white/20 p-2 rounded-full transition backdrop-blur-sm"
+            title="Profile"
+          >
             <User size={24} />
           </Link>
-          <button onClick={handleLogout} className="hover:text-gray-600">
+          <button 
+            onClick={handleLogout} 
+            className="text-white hover:bg-white/20 p-2 rounded-full transition backdrop-blur-sm"
+            title="Logout"
+          >
             <LogOut size={24} />
           </button>
         </div>

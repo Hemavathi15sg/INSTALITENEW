@@ -19,30 +19,15 @@ const Register: React.FC<RegisterProps> = ({ setIsAuthenticated }) => {
     setError('');
     setLoading(true);
 
-    console.log('Attempting registration with:', { username, email, password: '***' });
-
     try {
-      const response = await axios.post('/api/auth/register', { 
-        username, 
-        email, 
-        password 
-      });
-      
-      console.log('Registration successful:', response.data);
-      
+      const response = await axios.post('/api/auth/register', { username, email, password });
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       localStorage.setItem('userId', response.data.user.id.toString());
       setIsAuthenticated(true);
     } catch (err: any) {
-      console.error('Registration error:', err);
-      console.error('Error response:', err.response?.data);
-      console.error('Error status:', err.response?.status);
-      
       if (err.response?.data?.error) {
         setError(err.response.data.error);
-      } else if (err.message) {
-        setError(`Error: ${err.message}`);
       } else {
         setError('Registration failed. Please try again.');
       }
@@ -52,20 +37,28 @@ const Register: React.FC<RegisterProps> = ({ setIsAuthenticated }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-md w-96">
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="bg-white/95 backdrop-blur-md p-8 rounded-2xl shadow-2xl w-96 border border-white/20">
         <div className="flex justify-center mb-6">
-          <Camera size={48} className="text-pink-600" />
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 rounded-full">
+            <Camera size={48} className="text-white" />
+          </div>
         </div>
-        <h1 className="text-3xl font-bold text-center mb-6 font-serif">Instagram Lite</h1>
+        <h1 className="text-3xl font-bold text-center mb-6 font-serif bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+          Instagram Lite
+        </h1>
         
-        {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4">
+            {error}
+          </div>
+        )}
         
         <form onSubmit={handleSubmit}>
           <input
             type="text"
             placeholder="Username"
-            className="w-full p-3 border border-gray-300 rounded mb-3"
+            className="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
@@ -74,7 +67,7 @@ const Register: React.FC<RegisterProps> = ({ setIsAuthenticated }) => {
           <input
             type="email"
             placeholder="Email"
-            className="w-full p-3 border border-gray-300 rounded mb-3"
+            className="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -83,7 +76,7 @@ const Register: React.FC<RegisterProps> = ({ setIsAuthenticated }) => {
           <input
             type="password"
             placeholder="Password"
-            className="w-full p-3 border border-gray-300 rounded mb-4"
+            className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -91,7 +84,7 @@ const Register: React.FC<RegisterProps> = ({ setIsAuthenticated }) => {
           />
           <button 
             type="submit"
-            className="w-full bg-blue-500 text-white p-3 rounded font-semibold hover:bg-blue-600 disabled:bg-gray-400"
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={loading}
           >
             {loading ? 'Signing up...' : 'Sign Up'}
@@ -100,7 +93,9 @@ const Register: React.FC<RegisterProps> = ({ setIsAuthenticated }) => {
 
         <div className="text-center mt-4">
           <span className="text-gray-600">Have an account? </span>
-          <Link to="/login" className="text-blue-500 font-semibold">Log in</Link>
+          <Link to="/login" className="text-purple-600 font-semibold hover:text-purple-800">
+            Log in
+          </Link>
         </div>
       </div>
     </div>
