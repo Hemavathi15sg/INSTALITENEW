@@ -6,7 +6,12 @@ import authRoutes from './routes/auth';
 import postRoutes from './routes/posts';
 import userRoutes from './routes/users';
 
+// IMPORTANT: Load environment variables FIRST before any other code
 dotenv.config();
+
+console.log('Environment check:');
+console.log('- PORT:', process.env.PORT);
+console.log('- OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ Loaded' : '❌ Missing');
 
 const app = express();
 const PORT = process.env.PORT || 5000;

@@ -4,6 +4,14 @@ import path from 'path';
 import { Database } from '../database';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
+let captionService: any;
+const getCaptionService = () => {
+  if (!captionService) {
+    captionService = require('../services/captionService').default;
+  }
+  return captionService;
+};
+
 const router = express.Router();
 const db = Database.getInstance().getDb();
 
@@ -15,6 +23,23 @@ const storage = multer.diskStorage({
   }
 });
 const upload = multer({ storage });
+
+// Multer configuration for temporary caption generation uploads
+const tempStorage = multer.memoryStorage();
+const tempUpload = multer({ 
+  storage: tempStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'));
+    }
+  }
+});
 
 // Get all posts
 router.get('/', (req, res) => {
@@ -32,6 +57,62 @@ router.get('/', (req, res) => {
     }
     res.json(posts);
   });
+});
+
+// Generate caption suggestions for an image
+router.post('/generate-caption', authenticate, tempUpload.single('image'), async (req: AuthRequest, res) => {
+  try {
+    // Validate that an image was uploaded
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'No image file provided' 
+      });
+    }
+
+    // Get the image buffer and mime type from the uploaded file
+    const imageBuffer = req.file.buffer;
+    const mimeType = req.file.mimetype;
+
+    // Call the caption service to generate captions
+    const result = await getCaptionService().generateCaptionsFromBuffer(imageBuffer, mimeType);
+    
+    // Return the result (success or error)
+    if (result.success) {
+      return res.status(200).json({
+        success: true,
+        captions: result.captions,
+        message: 'Captions generated successfully'
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to generate captions'
+      });
+    }
+  } catch (error) {
+    console.error('Error in generate-caption endpoint:', error);
+    
+    // Handle multer errors
+    if (error instanceof multer.MulterError) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          error: 'File size too large. Maximum size is 10MB.'
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: `Upload error: ${error.message}`
+      });
+    }
+
+    // Handle other errors
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'An unexpected error occurred'
+    });
+  }
 });
 
 // Create post

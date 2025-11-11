@@ -9,6 +9,7 @@ export class Database {
     const dbPath = path.join(__dirname, '../instagram-lite.db');
     this.db = new sqlite3.Database(dbPath);
     this.initializeTables();
+    this.runMigrations();
   }
 
   public static getInstance(): Database {
@@ -71,6 +72,41 @@ export class Database {
           FOREIGN KEY (post_id) REFERENCES posts(id)
         )
       `);
+    });
+  }
+
+  /**
+   * Run database migrations to add new columns or modify schema
+   * Executes safely without breaking existing data
+   */
+  private runMigrations(): void {
+    this.db.serialize(() => {
+      // Check if ai_caption column exists in posts table
+      this.db.all(`PRAGMA table_info(posts)`, [], (err, columns: any[]) => {
+        if (err) {
+          console.error('Error checking posts table schema:', err);
+          return;
+        }
+
+        // Check if ai_caption column already exists
+        const aiCaptionExists = columns.some(col => col.name === 'ai_caption');
+
+        if (!aiCaptionExists) {
+          // Add ai_caption column if it doesn't exist
+          this.db.run(
+            `ALTER TABLE posts ADD COLUMN ai_caption TEXT DEFAULT NULL`,
+            (err) => {
+              if (err) {
+                console.error('Error adding ai_caption column:', err);
+              } else {
+                console.log('Successfully added ai_caption column to posts table');
+              }
+            }
+          );
+        } else {
+          console.log('ai_caption column already exists in posts table');
+        }
+      });
     });
   }
 

@@ -12,17 +12,42 @@ const Register: React.FC<RegisterProps> = ({ setIsAuthenticated }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    console.log('Attempting registration with:', { username, email, password: '***' });
+
     try {
-      const response = await axios.post('/api/auth/register', { username, email, password });
+      const response = await axios.post('/api/auth/register', { 
+        username, 
+        email, 
+        password 
+      });
+      
+      console.log('Registration successful:', response.data);
+      
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       localStorage.setItem('userId', response.data.user.id.toString());
       setIsAuthenticated(true);
-    } catch (err) {
-      setError('Registration failed. Username or email may already exist.');
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      console.error('Error response:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else if (err.message) {
+        setError(`Error: ${err.message}`);
+      } else {
+        setError('Registration failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -44,6 +69,7 @@ const Register: React.FC<RegisterProps> = ({ setIsAuthenticated }) => {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
+            disabled={loading}
           />
           <input
             type="email"
@@ -52,6 +78,7 @@ const Register: React.FC<RegisterProps> = ({ setIsAuthenticated }) => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={loading}
           />
           <input
             type="password"
@@ -60,12 +87,14 @@ const Register: React.FC<RegisterProps> = ({ setIsAuthenticated }) => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={loading}
           />
           <button 
             type="submit"
-            className="w-full bg-blue-500 text-white p-3 rounded font-semibold hover:bg-blue-600"
+            className="w-full bg-blue-500 text-white p-3 rounded font-semibold hover:bg-blue-600 disabled:bg-gray-400"
+            disabled={loading}
           >
-            Sign Up
+            {loading ? 'Signing up...' : 'Sign Up'}
           </button>
         </form>
 
